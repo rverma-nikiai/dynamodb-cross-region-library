@@ -1,10 +1,14 @@
 /*
  * Copyright 2014-2015 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- * 
+ *
  * SPDX-License-Identifier: Apache-2.0
  */
 package com.amazonaws.services.dynamodbv2.streams.connectors;
 
+import com.amazonaws.services.cloudwatch.AmazonCloudWatch;
+import com.amazonaws.services.cloudwatch.AmazonCloudWatchAsync;
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsync;
 import com.amazonaws.services.dynamodbv2.model.Record;
 import com.amazonaws.services.kinesis.connectors.KinesisConnectorConfiguration;
 import com.amazonaws.services.kinesis.connectors.impl.AllPassFilter;
@@ -25,11 +29,18 @@ import com.amazonaws.services.kinesis.connectors.interfaces.ITransformer;
  */
 
 public class DynamoDBMasterToReplicasPipeline implements IKinesisConnectorPipeline<Record, Record> {
+    private final AmazonDynamoDBAsync destinationDynamoDBClient;
+    private final AmazonCloudWatchAsync destinationCloudWatchClient;
+
+    public DynamoDBMasterToReplicasPipeline(AmazonDynamoDBAsync destinationDynamoDBClient, AmazonCloudWatchAsync destinationCloudWatchClient) {
+        this.destinationDynamoDBClient = destinationDynamoDBClient;
+        this.destinationCloudWatchClient = destinationCloudWatchClient;
+    }
 
     @Override
     public IEmitter<Record> getEmitter(final KinesisConnectorConfiguration configuration) {
         if (configuration instanceof DynamoDBStreamsConnectorConfiguration) {
-            return new DynamoDBReplicationEmitter((DynamoDBStreamsConnectorConfiguration) configuration);
+            return new DynamoDBReplicationEmitter((DynamoDBStreamsConnectorConfiguration) configuration, destinationDynamoDBClient,destinationCloudWatchClient);
         } else {
             throw new IllegalArgumentException(this + " needs a DynamoDBStreamsConnectorConfiguration argument.");
         }

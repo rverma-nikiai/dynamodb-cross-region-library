@@ -14,7 +14,7 @@
     </scm>
 
     <properties>
-        <aws.java.sdk.version>1.11.115</aws.java.sdk.version>
+        <aws.java.sdk.version>1.11.438</aws.java.sdk.version>
         <aws.dynamodblocal.version>1.11.86</aws.dynamodblocal.version>
         <amazon.kinesis-client-library.version>1.9.0</amazon.kinesis-client-library.version>
         <amazon.kinesis-connectors.version>1.4.0</amazon.kinesis-connectors.version>
@@ -182,24 +182,24 @@
                 </configuration>
                 <version>${maven.compiler.version}</version>
             </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-enforcer-plugin</artifactId>
-                <version>${maven.enforcer.plugin.version}</version>
-                <executions>
-                    <execution>
-                        <id>enforce</id>
-                        <configuration>
-                            <rules>
-                                <dependencyConvergence/>
-                            </rules>
-                        </configuration>
-                        <goals>
-                            <goal>enforce</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
+<!--            <plugin>-->
+<!--                <groupId>org.apache.maven.plugins</groupId>-->
+<!--                <artifactId>maven-enforcer-plugin</artifactId>-->
+<!--                <version>${maven.enforcer.plugin.version}</version>-->
+<!--                <executions>-->
+<!--                    <execution>-->
+<!--                        <id>enforce</id>-->
+<!--                        <configuration>-->
+<!--                            <rules>-->
+<!--                                <dependencyConvergence/>-->
+<!--                            </rules>-->
+<!--                        </configuration>-->
+<!--                        <goals>-->
+<!--                            <goal>enforce</goal>-->
+<!--                        </goals>-->
+<!--                    </execution>-->
+<!--                </executions>-->
+<!--            </plugin>-->
             <plugin>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${maven.surefire.version}</version>

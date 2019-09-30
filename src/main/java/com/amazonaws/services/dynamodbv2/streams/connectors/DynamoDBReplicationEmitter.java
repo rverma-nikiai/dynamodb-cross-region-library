@@ -5,18 +5,6 @@
  */
 package com.amazonaws.services.dynamodbv2.streams.connectors;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Date;
-import java.util.List;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
-
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.AmazonServiceException;
 import com.amazonaws.AmazonWebServiceRequest;
@@ -48,8 +36,19 @@ import com.amazonaws.services.dynamodbv2.model.UpdateItemRequest;
 import com.amazonaws.services.dynamodbv2.model.UpdateItemResult;
 import com.amazonaws.services.kinesis.connectors.UnmodifiableBuffer;
 import com.amazonaws.services.kinesis.connectors.interfaces.IEmitter;
-
 import lombok.extern.log4j.Log4j;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Date;
+import java.util.List;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * A general emitter for replication DynamoDB writes from a DynamoDB Stream to another DynamoDB table. Assumes the IBuffer implementation deduplicates writes to a single write per
@@ -188,11 +187,13 @@ public class DynamoDBReplicationEmitter implements IEmitter<Record> {
 
         final boolean setDynamoDB = DYNAMODB.compareAndSet(null, dynamoDBAsync);
         if (setDynamoDB && dynamoDBAsync != null) {
-            DYNAMODB.get().setEndpoint(endpoint);
+            log.info("Dynamo subscriber");
+//            DYNAMODB.get().setEndpoint(endpoint);
         }
         final boolean setCloudWatch = CLOUDWATCH.compareAndSet(null, cloudwatch);
         if (setCloudWatch && cloudwatch != null) {
-            CLOUDWATCH.get().setRegion(Regions.getCurrentRegion() == null ? Region.getRegion(Regions.US_EAST_1) : Regions.getCurrentRegion());
+            log.info("cloudwatch subscriber");
+//            CLOUDWATCH.get().setRegion(Regions.getCurrentRegion() == null ? Region.getRegion(Regions.US_EAST_1) : Regions.getCurrentRegion());
         }
         skipErrors = false; // TODO make configurable
     }

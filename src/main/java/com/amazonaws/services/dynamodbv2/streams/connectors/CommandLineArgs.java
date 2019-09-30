@@ -5,6 +5,7 @@
  */
 package com.amazonaws.services.dynamodbv2.streams.connectors;
 
+import com.amazonaws.auth.BasicAWSCredentials;
 import com.beust.jcommander.Parameter;
 
 import lombok.Getter;
@@ -84,4 +85,22 @@ public class CommandLineArgs {
             description = "Wait for this long between polls to check if parent shards are done",
             hidden = true)
     private Long parentShardPollIntervalMillis;
+
+    public static final String SOURCE_CREDENTIALS = "--sourceCredentials";
+    @Parameter(names = SOURCE_CREDENTIALS, description = "Use this flag to provide different source credentials")
+    private String sourceCredentials = "access_ke/secret";
+
+    public BasicAWSCredentials getSourceCredentials() {
+        String[] temp  = sourceCredentials.split("/");
+        return new BasicAWSCredentials(temp[0],temp[1]);
+    }
+
+    public static final String DESTINATION_CREDENTIALS = "--destinationCredentials";
+    @Parameter(names = DESTINATION_CREDENTIALS, description = "Use this flag to provide different destination credentials")
+    private String destinationCredentials = "access_ke/secret";
+
+    public BasicAWSCredentials getDestinationCredentials() {
+        String[] temp  = destinationCredentials.split("/");
+        return new BasicAWSCredentials(temp[0],temp[1]);
+    }
 }

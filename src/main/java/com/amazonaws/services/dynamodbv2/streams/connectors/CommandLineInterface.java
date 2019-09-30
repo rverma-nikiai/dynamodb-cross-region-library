@@ -1,15 +1,14 @@
 /*
  * Copyright 2014-2015 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- * 
+ *
  * SPDX-License-Identifier: Apache-2.0
  */
 package com.amazonaws.services.dynamodbv2.streams.connectors;
 
-import java.util.Properties;
-import java.util.UUID;
-
 import com.amazonaws.ClientConfiguration;
 import com.amazonaws.auth.AWSCredentialsProvider;
+import com.amazonaws.auth.AWSStaticCredentialsProvider;
+import com.amazonaws.auth.BasicAWSCredentials;
 import com.amazonaws.auth.DefaultAWSCredentialsProviderChain;
 import com.amazonaws.auth.STSAssumeRoleSessionCredentialsProvider;
 import com.amazonaws.client.builder.AwsClientBuilder;
@@ -17,8 +16,12 @@ import com.amazonaws.client.builder.AwsClientBuilder.EndpointConfiguration;
 import com.amazonaws.regions.Region;
 import com.amazonaws.regions.RegionUtils;
 import com.amazonaws.services.cloudwatch.AmazonCloudWatch;
+import com.amazonaws.services.cloudwatch.AmazonCloudWatchAsync;
+import com.amazonaws.services.cloudwatch.AmazonCloudWatchAsyncClientBuilder;
 import com.amazonaws.services.cloudwatch.AmazonCloudWatchClientBuilder;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDB;
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsync;
+import com.amazonaws.services.dynamodbv2.AmazonDynamoDBAsyncClientBuilder;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBClientBuilder;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBStreams;
 import com.amazonaws.services.dynamodbv2.AmazonDynamoDBStreamsClientBuilder;
@@ -28,17 +31,17 @@ import com.amazonaws.services.kinesis.clientlibrary.lib.worker.InitialPositionIn
 import com.amazonaws.services.kinesis.clientlibrary.lib.worker.KinesisClientLibConfiguration;
 import com.amazonaws.services.kinesis.clientlibrary.lib.worker.Worker;
 import com.amazonaws.services.kinesis.connectors.KinesisConnectorRecordProcessorFactory;
-import com.amazonaws.services.securitytoken.AWSSecurityTokenService;
-import com.amazonaws.services.securitytoken.AWSSecurityTokenServiceClient;
 import com.beust.jcommander.JCommander;
 import com.beust.jcommander.ParameterException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
-
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.extern.log4j.Log4j;
+
+import java.util.Properties;
+import java.util.UUID;
 
 /**
  * A command line interface allowing the connector to be launched independently from command line
@@ -49,8 +52,7 @@ public class CommandLineInterface {
     /**
      * Command line main method entry point
      *
-     * @param args
-     *            command line arguments
+     * @param args command line arguments
      */
     public static void main(String[] args) {
         try {
@@ -107,6 +109,8 @@ public class CommandLineInterface {
     private final String taskName;
     private final String destinationTable;
     private final Optional<Long> parentShardPollIntervalMillis;
+    private final Optional<BasicAWSCredentials> sourceCredentials;
+    private final Optional<BasicAWSCredentials> destinationCredentials;
 
     @VisibleForTesting
     CommandLineInterface(CommandLineArgs params) throws ParameterException {
@@ -118,6 +122,7 @@ public class CommandLineInterface {
         sourceDynamodbEndpoint = Optional.fromNullable(params.getSourceEndpoint());
         sourceDynamodbStreamsEndpoint = Optional.fromNullable(params.getSourceEndpoint());
         sourceRoleArn = Optional.fromNullable(params.getSourceRoleArn());
+        sourceCredentials = Optional.fromNullable(params.getSourceCredentials());
 
         // get source table name
         sourceTable = params.getSourceTable();
@@ -132,6 +137,7 @@ public class CommandLineInterface {
         destinationDynamodbEndpoint = Optional.fromNullable(params.getDestinationEndpoint());
         destinationRoleArn = Optional.fromNullable(params.getDestinationRoleArn());
         destinationTable = params.getDestinationTable();
+        destinationCredentials = Optional.fromNullable(params.getDestinationCredentials());
 
         // other crr parameters
         getRecordsLimit = Optional.fromNullable(params.getBatchSize());
@@ -158,7 +164,7 @@ public class CommandLineInterface {
         // use default credential provider chain to locate appropriate credentials if role to assume for source table is not present
         final AWSCredentialsProvider sourceTableCredentialsProvider = sourceRoleArn.isPresent()
                 ? new STSAssumeRoleSessionCredentialsProvider.Builder(sourceRoleArn.get(), kclWorkerId).build()
-                : new DefaultAWSCredentialsProviderChain();
+                : sourceCredentials.isPresent() ? new AWSStaticCredentialsProvider(sourceCredentials.get()) : new DefaultAWSCredentialsProviderChain();
 
         // initialize DynamoDB client and set the endpoint properly for source table / region
         final AmazonDynamoDB dynamodbClient = AmazonDynamoDBClientBuilder.standard()
@@ -185,7 +191,7 @@ public class CommandLineInterface {
         // use default credential provider chain to locate appropriate credentials if role to assume for kcl is not present
         final AWSCredentialsProvider kclCredentialsProvider = kclRoleArn.isPresent()
                 ? new STSAssumeRoleSessionCredentialsProvider.Builder(kclRoleArn.get(), kclWorkerId).build()
-                : new DefaultAWSCredentialsProviderChain();
+                : sourceCredentials.isPresent() ? new AWSStaticCredentialsProvider(sourceCredentials.get()) : new DefaultAWSCredentialsProviderChain();
 
         // initialize DynamoDB client for KCL
         final AmazonDynamoDB kclDynamoDBClient = AmazonDynamoDBClientBuilder.standard()
@@ -209,7 +215,7 @@ public class CommandLineInterface {
         // use default credential provider chain to locate appropriate credentials if role to assume for kcl is not present
         final AWSCredentialsProvider destinationTableCredentialsProvider = destinationRoleArn.isPresent()
                 ? new STSAssumeRoleSessionCredentialsProvider.Builder(destinationRoleArn.get(), kclWorkerId).build()
-                : new DefaultAWSCredentialsProviderChain();
+                : destinationCredentials.isPresent() ? new AWSStaticCredentialsProvider(destinationCredentials.get()) : new DefaultAWSCredentialsProviderChain();
 
         // set the appropriate Connector properties for the destination KCL configuration
         final Properties destinationTableProperties = new Properties();
@@ -220,8 +226,23 @@ public class CommandLineInterface {
 
         // create the record processor factory based on given pipeline and connector configurations
         // use the master to replicas pipeline
+
+        final AmazonDynamoDBAsync destinationDynamoDBClient = AmazonDynamoDBAsyncClientBuilder.standard()
+                .withCredentials(destinationTableCredentialsProvider)
+                .withEndpointConfiguration(createEndpointConfiguration(destinationRegion, destinationDynamodbEndpoint, AmazonDynamoDB.ENDPOINT_PREFIX))
+                .build();
+
+        final AmazonCloudWatchAsync destinationCloudWatchClient;
+        if (isPublishCloudWatch) {
+            destinationCloudWatchClient = AmazonCloudWatchAsyncClientBuilder.standard()
+                    .withCredentials(destinationTableCredentialsProvider)
+                    .withRegion(kclRegion.or(sourceRegion).getName()).build();
+        } else {
+            destinationCloudWatchClient = new NoopCloudWatch();
+        }
+
         final KinesisConnectorRecordProcessorFactory<Record, Record> factory = new KinesisConnectorRecordProcessorFactory<>(
-                new DynamoDBMasterToReplicasPipeline(), new DynamoDBStreamsConnectorConfiguration(destinationTableProperties, destinationTableCredentialsProvider));
+                new DynamoDBMasterToReplicasPipeline(destinationDynamoDBClient, destinationCloudWatchClient), new DynamoDBStreamsConnectorConfiguration(destinationTableProperties, destinationTableCredentialsProvider));
 
         // create the KCL configuration with default values
         final KinesisClientLibConfiguration kclConfig = new KinesisClientLibConfiguration(actualTaskName,
